@@ -1,0 +1,317 @@
+substitutions:
+    device_name: lonsonho-x802a-lg-gameroom-2
+    name: "Lonsonho Switch Gameroom 2"
+    ota_pass: "pass"
+    wifi_ssid: "wifi"
+    wifi_pass: "pass
+    ap_pass: "pass"
+    api_pass: "pass"
+    web_user: "admin"
+    web_pass: "pass"
+    logging: VERBOSE
+    
+    left_button_relay: "left"
+    right_button_relay: "right"
+    light_restore_mode: RESTORE_DEFAULT_OFF
+    
+
+esphome:
+  name: ${device_name}
+  platform: ESP8266
+  board: esp01_1m
+
+logger:
+  level: ${logging}
+
+ota:
+  password: ${ota_pass}
+
+wifi:
+  ssid: ${wifi_ssid}
+  password: ${wifi_pass}
+  fast_connect: on
+  ap:
+    ssid: ${device_name}
+    password: ${ap_pass}
+
+# Enable Home Assistant API
+api:
+  password: ${api_pass}
+  reboot_timeout: 0s
+  
+# Web server
+web_server:
+  port: 80
+  auth:
+    username: ${web_user}
+    password: ${web_pass}
+    
+output:
+  - platform: gpio
+    pin: GPIO12
+    id: output_left_relay
+    
+  - platform: gpio
+    pin: GPIO14
+    id: output_right_relay
+    
+  - platform: gpio
+    id: output_led_green  
+    pin: 
+      number: GPIO13
+      mode: OUTPUT
+      inverted: true 
+      
+light:
+  - platform: binary
+    name: "${name} Left Button"
+    id: left_relay
+    output: output_${left_button_relay}_relay
+    restore_mode: ${light_restore_mode}
+
+  - platform: binary
+    name: "${name} Right Button"
+    id: right_relay
+    output: output_${right_button_relay}_relay
+    restore_mode: ${light_restore_mode}
+
+binary_sensor:
+  - platform: gpio
+    name: "${name} Pressed Left Button"  
+    id: button_left    
+    pin: 
+      number: GPIO4
+      mode: INPUT_PULLUP
+    filters:
+      - invert:
+      - delayed_on: 20ms
+    on_multi_click:
+      # Short pressed Left Button
+      - timing:
+        - ON for 50ms to 1000ms
+        then:
+          - logger.log: "One-Pressed Left Button"
+          - if:
+              condition:
+                - switch.is_off: buttons_lock
+              then:
+                - if:
+                    condition:
+                      - light.is_off: left_relay
+                    then:
+                      - light.turn_on: left_relay
+                    else:
+                      - light.turn_off: left_relay
+              else:
+                - output.turn_off: output_led_green
+                - delay: 100ms              
+                - output.turn_on: output_led_green
+                - delay: 200ms
+                - output.turn_off: output_led_green
+                - delay: 100ms              
+                - output.turn_on: output_led_green
+                - delay: 200ms
+                - output.turn_off: output_led_green              
+                - delay: 100ms      
+                - if:
+                    condition:
+                      - switch.is_on: backlighting
+                    then:
+                      - output.turn_on: output_led_green
+
+      # Long pressed Left Button
+      - timing:
+        - ON for at least 1500ms
+        then:
+          - logger.log: "Long-Pressed Left Button"
+          - if:
+              condition:
+                - binary_sensor.is_off: button_right
+              then:
+                - if:
+                    condition:
+                      - switch.is_off: buttons_lock
+                    then:
+                      - switch.turn_on: buttons_lock
+                      - output.turn_off: output_led_green                
+                      - delay: 500ms
+                      - output.turn_on: output_led_green               
+                      - delay: 1000ms
+                      - output.turn_off: output_led_green                      
+                    else:
+                      - output.turn_off: output_led_green                
+                      - delay: 500ms
+                      - output.turn_on: output_led_green               
+                      - delay: 1000ms
+                      - output.turn_off: output_led_green
+                      - if:
+                          condition:
+                            - switch.is_on: backlighting
+                          then:
+                            - output.turn_on: output_led_green
+                      - switch.turn_off: buttons_lock
+              else:
+                - if:
+                    condition:
+                      - switch.is_off: buttons_lock
+                    then:
+                      - binary_sensor.template.publish:
+                          id: pressed_two_buttons
+                          state: true
+                      - binary_sensor.template.publish:
+                          id: pressed_two_buttons
+                          state: false
+                    else:
+                      - output.turn_off: output_led_green
+                      - delay: 100ms              
+                      - output.turn_on: output_led_green
+                      - delay: 200ms
+                      - output.turn_off: output_led_green
+                      - delay: 100ms              
+                      - output.turn_on: output_led_green
+                      - delay: 200ms
+                      - output.turn_off: output_led_green              
+                      - delay: 100ms      
+                      - if:
+                          condition:
+                            - switch.is_on: backlighting
+                          then:
+                            - output.turn_on: output_led_green
+
+  - platform: gpio
+    name: "${name} Pressed Right Button"  
+    id: button_right    
+    pin: 
+      number: RX
+      mode: INPUT_PULLUP
+    filters:
+      - invert:
+      - delayed_on: 20ms
+    on_multi_click:
+      # Short pressed Right Button
+      - timing:
+        - ON for 50ms to 1000ms
+        then:
+          - logger.log: "One-Pressed Right Button"
+          - if:
+              condition:
+                - switch.is_off: buttons_lock
+              then:
+                - if:
+                    condition:
+                      - light.is_off: right_relay
+                    then:
+                      - light.turn_on: right_relay
+                    else:
+                      - light.turn_off: right_relay
+              else:
+                - output.turn_off: output_led_green
+                - delay: 100ms              
+                - output.turn_on: output_led_green
+                - delay: 200ms
+                - output.turn_off: output_led_green
+                - delay: 100ms              
+                - output.turn_on: output_led_green
+                - delay: 200ms
+                - output.turn_off: output_led_green              
+                - delay: 100ms              
+                - if:
+                    condition:
+                      - switch.is_on: backlighting
+                    then:
+                      - output.turn_on: output_led_green
+
+      # Long pressed Right Button
+      - timing:
+        - ON for at least 1500ms
+        then:
+          - logger.log: "Long-Pressed Right Button"
+          - if:
+              condition:
+                - binary_sensor.is_off: button_left
+              then:
+                - if:
+                    condition:
+                      - switch.is_off: buttons_lock
+                    then:
+                      - switch.turn_on: buttons_lock
+                      - output.turn_off: output_led_green                
+                      - delay: 500ms
+                      - output.turn_on: output_led_green               
+                      - delay: 1000ms
+                      - output.turn_off: output_led_green
+                      - if:
+                          condition:
+                            - switch.is_on: backlighting
+                          then:
+                            - output.turn_on: output_led_green
+                    else:
+                      - output.turn_off: output_led_green                
+                      - delay: 500ms
+                      - output.turn_on: output_led_green               
+                      - delay: 1000ms
+                      - output.turn_off: output_led_green
+                      - if:
+                          condition:
+                            - switch.is_on: backlighting
+                          then:
+                            - output.turn_on: output_led_green
+                      - switch.turn_off: buttons_lock             
+              else:
+                - if:
+                    condition:
+                      - switch.is_off: buttons_lock
+                    then:
+                      - binary_sensor.template.publish:
+                          id: pressed_two_buttons
+                          state: true
+                      - binary_sensor.template.publish:
+                          id: pressed_two_buttons
+                          state: false
+                    else:
+                      - output.turn_off: output_led_green
+                      - delay: 100ms              
+                      - output.turn_on: output_led_green
+                      - delay: 200ms
+                      - output.turn_off: output_led_green
+                      - delay: 100ms              
+                      - output.turn_on: output_led_green
+                      - delay: 200ms
+                      - output.turn_off: output_led_green              
+                      - delay: 100ms      
+                      - if:
+                          condition:
+                            - switch.is_on: backlighting
+                          then:
+                            - output.turn_on: output_led_green
+
+  - platform: template
+    name: "${name} Pressed Two Buttons"  
+    id: pressed_two_buttons
+
+switch:
+  - platform: template
+    name: "${name} Backlighting"
+    id: backlighting
+    icon: "mdi:weather-night"
+    optimistic: true
+    restore_state: true
+    on_turn_on:
+      - output.turn_on: output_led_green
+    on_turn_off:
+      - output.turn_off: output_led_green
+
+  - platform: template
+    name: "${name} Buttons Lock"
+    id: buttons_lock
+    icon: "mdi:lock"
+    optimistic: true
+    restore_state: true
+
+  - platform: restart
+    name: "${name} Restart"
+
+sensor:  
+  - platform: wifi_signal
+    name: "${name} WiFi Signal"
+    update_interval: 60s
